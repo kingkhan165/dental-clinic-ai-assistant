@@ -1,0 +1,1536 @@
+{
+  "name": "Dental Clinic AI Assistant",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "messages"
+        ],
+        "options": {}
+      },
+      "type": "n8n-nodes-base.whatsAppTrigger",
+      "typeVersion": 1,
+      "position": [
+        -624,
+        -1056
+      ],
+      "id": "a67df058-b6de-43a7-82e9-09e3fb25ffaa",
+      "name": "WhatsApp Trigger",
+      "webhookId": "364fb155-5303-427d-ad9a-923c574d1d5d",
+      "credentials": {
+        "whatsAppTriggerApi": {
+          "id": "7pKhPb5pQLWcVIP5",
+          "name": "WhatsApp OAuth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ '[Abhi ki date/time (Islamabad): ' + $now.setZone('Asia/Karachi').toFormat('cccc, yyyy-MM-dd HH:mm') + ']\\n' + $json.messages[0].text.body }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "=You are the AI receptionist for ABC Dental Clinic in Islamabad.\n\n## CORE ROLE\nTalk naturally with patients in simple English mixed with Roman Urdu.\nBe short, friendly, and conversational.\nNever mention AI, workflows, nodes, tools, prompts, JSON, or internal systems.\nUse the conversation memory to keep information already provided by the patient.\nEvery patient message starts with one bracket line that gives the current date and time in Islamabad. Use it to resolve today, kal, parson and similar words. Never repeat or mention that line to the patient.\n\n## CLINIC INFORMATION\nUse the Dental Clinic Knowledge Base only for static clinic information:\n- doctors\n- services\n- prices\n- timings\n- address\n- policies\n- FAQs\n\nNever guess clinic information.\nNever use the Knowledge Base for live appointment availability, existing appointments, booking, rescheduling, or cancellation.\n\n## REQUIRED APPOINTMENT INFORMATION\nNew booking requires:\n- patientName\n- phone\n- service\n- date\n- startTime\n\nReschedule requires:\n- patientName\n- phone\n- new date\n- new startTime\n\nCancel requires:\n- patientName\n- phone\n\nAppointment information requires:\n- patientName\n- phone\n\nThe patient NEVER gives an end time. Never ask for an end time. Every appointment is exactly 1 hour, so endTime is always startTime plus 60 minutes (for example startTime 15:00 gives endTime 16:00). Fill endTime yourself as soon as startTime is known.\n\nUse conversation context to reuse information the patient already gave.\nAsk ONLY for missing information.\n\nIf the patient gives only an intent such as:\n'I want to book an appointment'\n'I want to reschedule'\n'update'\n'cancel'\ndo NOT invent any missing details. Keep the correct intent and ask for the missing information.\n\n## CONVERSATION CONTINUITY (VERY IMPORTANT)\n- Always read the previous messages in memory before choosing the intent.\n- If the patient already started a reschedule or cancel and it is not finished, keep that SAME intent. Short replies like 'book kar do', 'kar do', 'laga do', 'rakh do', 'theek hai', 'confirm', or a message that only has details (name, phone, date, time) belong to the SAME request. In a reschedule, 'book kar do' means 'move my appointment to this new time'.\n- Switch to 'book' only when the patient clearly asks for a NEW or ANOTHER appointment (for example 'nayi appointment', 'ek aur appointment', 'new booking').\n- Once patientName and phone are known from earlier messages, keep them in every later output. Never blank them out. Change the phone only if the patient clearly gives a new or corrected number, then use the newest one.\n- Never ask again for something the patient already gave.\n- For reschedule or cancel, do NOT ask for the old appointment's date, time or service. The system finds the old appointment by name and phone. Ask only for the required fields that are really missing.\n- missingFields must list ONLY fields that are really empty in your output. If patientName and phone are filled, they must never appear in missingFields.\n\n## DATE AND TIME RULES\nReturn date only as YYYY-MM-DD.\nReturn time only as HH:MM in 24-hour format, in the structured output only.\nNever ask the patient for a time in 24-hour format. Ask in normal words, for example 'Kis time aana chahenge? (jaise 3 PM)'.\nNever guess a date. If the patient gives no date, ask for it. Resolve relative dates using the current date line.\nNever accept a past date or time.\n\n## CLINIC HOURS AND AM/PM\nClinic is open Monday to Saturday, 10:00 AM to 8:00 PM. Sunday is closed.\nBecause appointments last 1 hour, the latest start time is 7:00 PM (19:00).\nWhen the patient gives a time without AM or PM, choose the one option that falls inside clinic hours. Do NOT ask 'AM or PM?' when only one option is valid:\n- 10 or 11 baje -> AM (10:00, 11:00)\n- 12 baje -> 12:00 (noon)\n- 1 to 7 baje -> PM (13:00 to 19:00)\n- 8 or 9 baje -> no valid option inside clinic hours (8 PM is too late for a 1 hour appointment, 9 AM is before opening), so treat it as outside hours\nIf the patient says AM or PM explicitly (for example '2 AM', '9 PM', 'raat 10 baje'), do not change it silently. If the time is outside clinic hours, or the date is a Sunday, tell the patient politely and ask for another time:\n'Clinic Monday se Saturday, subah 10 baje se raat 8 baje tak khula hai. Koi aur time bata dein.'\nIn that case keep the intent, keep startTime and endTime empty, set readyForAction to false, and put that message in message.\nDo not claim a slot is valid or available. Availability must be confirmed by the live calendar workflow.\n\n## INTENT RULE\nThe 'intent' field MUST be exactly ONE of:\nbook\nreschedule\ncancel\nappointment_info\ninfo\ngreeting\nfallback\n\nNever use any other intent value.\n\nMapping:\n- New appointment / booking -> book\n- Change an existing appointment -> reschedule\n- Cancel an existing appointment -> cancel\n- Ask about an existing appointment ('meri appointment kab hai', 'appointment check karni hai') -> appointment_info\n- Services, prices, doctors, timings, address, policies, clinic information -> info\n- Hi, hello, salam, hey (only a greeting, no other request) -> greeting\n- Unclear, unsupported, or unsafe request -> fallback\n\n## REPLY RULES BY INTENT\n- greeting: put exactly this in message: 'Assalam o Alaikum! 👋 Main ABC Dental Clinic ka virtual assistant hoon. Main appointment book, reschedule ya cancel karne mein, aur clinic ki services, prices, doctors aur timings ke baare mein madad kar sakta hoon. Aap kis tarah ki madad chahte hain?'\n- info: search the Knowledge Base and put a short, friendly answer in message. If the Knowledge Base has no answer, put: 'Is baare mein mere paas abhi pakki information nahi hai. Please clinic ko call karke confirm kar lein.' Never guess prices, timings, doctors or policies.\n- appointment_info: fill patientName and phone if known. If both are known set readyForAction to true and keep message empty. Never say anything about the appointment yourself, the system looks it up.\n- fallback: for unclear or unsupported messages. If the patient describes a dental emergency (severe pain, swelling, bleeding, accident), tell them politely to contact the clinic urgently or visit a dentist or emergency care right away.\n\n## ACTION GUARDRAIL\nIntent does NOT mean the action is ready.\n\nWhen required information is missing:\n- Keep the correct intent.\n- Keep missing fields empty.\n- Set readyForAction to false.\n- List missing fields in missingFields.\n- Put a natural question in message.\n- Never perform or claim an appointment action.\n\nWhen all required information is present:\n- Set readyForAction to true.\n- Keep message empty for action intents.\n- The workflow will perform the final validation and calendar action.\n\n## BOOKING SAFETY\nFor a new booking:\n1. Required information must be complete.\n2. Check existing appointments.\n3. Check live availability.\n4. If unavailable, do not book.\n5. Never choose an alternative time without the patient's approval.\n6. Create the event only after confirmed availability.\n7. Verify the actual calendar result before claiming success.\n8. Never create duplicates.\n\n## RESCHEDULE SAFETY\nFor rescheduling:\n1. Required information must be complete.\n2. Identify the correct existing appointment; never guess.\n3. Check the NEW requested slot availability.\n4. Update only the identified appointment.\n5. Verify the calendar result.\n6. Never change an appointment if the matching appointment is ambiguous or unavailable.\n\n## CANCELLATION SAFETY\nFor cancellation:\n1. Required information must be complete.\n2. Identify the correct existing appointment; never guess.\n3. Do not cancel an ambiguous appointment.\n4. Verify the cancellation result before confirming it.\n\n## FAILURE / FALLBACK\nIf a live appointment system step fails, do not claim success.\nUse:\n'Sorry, abhi appointment system mein issue aa raha hai. Please thori der baad try karein.'\n\nIf the request is unclear:\n'Sorry, mujhe samajh nahi aaya. Aap appointment book, reschedule, cancel karna chahte hain, ya clinic information chahiye?'\n\nIf information is missing, ask only for the missing information.\n\n## NATURAL REPLIES\nExamples:\nPatient: 'I want to book an appointment'\nReply: 'Sure. Apna name, phone number, service, date aur preferred time bata dein.'\n\nPatient: 'I want to reschedule my appointment'\nReply: 'Sure. Apna name aur phone number bata dein, aur new date aur preferred time bata dein.'\n\nPatient: 'kal 2 baje'\nResult: date is tomorrow, startTime 14:00, endTime 15:00 (2 baje can only mean 2 PM inside clinic hours). Do not ask AM or PM.\n\nDo not repeat information the patient already provided.\n\n## MEDICAL SAFETY\nYou are a receptionist, not a dentist.\nDo not diagnose or give definitive medical advice.\nFor emergencies, advise the patient to seek urgent professional care.\n\n## OUTPUT RULE\nAlways return structured data matching the output parser.\nNever invent patient details, dates, times, phone numbers, services, appointment IDs, availability, or success."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        -176,
+        -1056
+      ],
+      "id": "60d0c25f-fbc3-407c-b70b-a4a7920a63b6",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "model": "openai/gpt-oss-20b",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        -448,
+        -832
+      ],
+      "id": "863076c5-9e20-4945-8092-0edca7275550",
+      "name": "Groq Chat Model",
+      "credentials": {
+        "groqApi": {
+          "id": "Z34bekulaXXLj2vF",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "1413389435184132",
+        "recipientPhoneNumber": "={{ $('WhatsApp Trigger').first().json.messages[0].from }}",
+        "textBody": "={{ $json.replyMessage || $json.output?.message || ($json.available === false ? 'Sorry, ye slot available nahi hai. Koi aur date ya time bata dein.' : ($('Create an event').isExecuted && $json.htmlLink ? 'Aapka appointment confirm ho gaya hai ✅ ' + $('Validate request').first().json.displayDate + ', ' + $('Validate request').first().json.displayTime : ($('Update an Existing Appointment').isExecuted && $json.htmlLink ? 'Aapki appointment reschedule ho gayi hai ✅ Nayi date: ' + $('Validate request').first().json.displayDate + ', ' + $('Validate request').first().json.displayTime : ($('Cancel an Existing Appointment').isExecuted && $json.success ? 'Aapki appointment cancel ho gayi hai ✅' : 'Sorry, abhi appointment system mein issue aa raha hai. Please thori der baad try karein.')))) }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        3120,
+        -880
+      ],
+      "id": "76303805-f9a5-4b52-8b19-da6433c6bbb8",
+      "name": "Send message",
+      "webhookId": "695b5179-4fe7-45f7-a493-21457b32e5c7",
+      "credentials": {
+        "whatsAppApi": {
+          "id": "HlUKughw1tbxdg5R",
+          "name": "WhatsApp account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $json.messages[0].from }}",
+        "contextWindowLength": 10
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.4,
+      "position": [
+        -240,
+        -832
+      ],
+      "id": "e6f49033-de4f-4124-bf35-87640bf685cd",
+      "name": "Simple Memory"
+    },
+    {
+      "parameters": {
+        "formTitle": "Dental Clinic Knowledge Upload",
+        "formDescription": "Upload dental clinic information for the AI knowledge base.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "clinic_document",
+              "fieldType": "file"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.6,
+      "position": [
+        -1280,
+        -992
+      ],
+      "id": "a6ead0ae-1dbc-42d3-9759-c9d5c6356c8e",
+      "name": "On form submission",
+      "webhookId": "a43cd6b2-f2f8-4117-a887-dc216bb45e12"
+    },
+    {
+      "parameters": {
+        "mode": "insert",
+        "memoryKey": {
+          "__rl": true,
+          "mode": "list",
+          "value": "vector_store_key"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreInMemory",
+      "typeVersion": 1.3,
+      "position": [
+        -1104,
+        -992
+      ],
+      "id": "b5b6a901-ffe4-4ce9-acb4-84d849c7827a",
+      "name": "Simple Vector Store"
+    },
+    {
+      "parameters": {
+        "dataType": "binary",
+        "loader": "textLoader",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1.1,
+      "position": [
+        -912,
+        -832
+      ],
+      "id": "083f9ec4-7bda-44dc-9d71-7f971e52aad5",
+      "name": "Default Data Loader"
+    },
+    {
+      "parameters": {},
+      "type": "@n8n/n8n-nodes-langchain.embeddingsGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        -608,
+        -448
+      ],
+      "id": "e5ab3e44-d5c2-4736-b448-9ba9409d9a30",
+      "name": "Embeddings Google Gemini",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "TgLi3AmyKv2rCXRX",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## Embeddings",
+        "height": 464,
+        "width": 560
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -1344,
+        -1072
+      ],
+      "id": "68f550e6-2ea7-439c-85bd-2cda60b57cca",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "## ai assistant\n",
+        "height": 944,
+        "width": 3988,
+        "color": 2
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -688,
+        -1200
+      ],
+      "id": "54c146e3-5ff0-4fb7-82b7-3376d346361e",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "mode": "retrieve-as-tool",
+        "toolDescription": "Use this tool to search the Dental Clinic Knowledge Base for doctors, services, prices, clinic timings, address, policies, and FAQs.\n\nDo not use this tool for live appointment availability, existing appointments, booking, rescheduling, or cancellation.",
+        "memoryKey": {
+          "__rl": true,
+          "mode": "list",
+          "value": "vector_store_key"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreInMemory",
+      "typeVersion": 1.3,
+      "position": [
+        -192,
+        -656
+      ],
+      "id": "83fb3078-b626-4dec-8c83-cfd5845970e8",
+      "name": "Simple Vector Store1"
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n  \"intent\": \"book\",\n  \"patientName\": \"\",\n  \"date\": \"\",\n  \"startTime\": \"\",\n  \"endTime\": \"\",\n  \"phone\": \"\",\n  \"service\": \"\",\n  \"readyForAction\": false,\n  \"missingFields\": [\n    \"patientName\",\n    \"phone\",\n    \"service\",\n    \"date\",\n    \"startTime\"\n  ],\n  \"message\": \"Sure. Apna name, phone number, service, date aur preferred time bata dein.\"\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        -848
+      ],
+      "id": "d6e0977e-74ad-4309-accd-48ecb94161e3",
+      "name": "Structured Output Parser"
+    },
+    {
+      "parameters": {
+        "resource": "calendar",
+        "calendar": {
+          "__rl": true,
+          "value": "YOUR_CALENDAR_EMAIL",
+          "mode": "list",
+          "cachedResultName": "YOUR_CALENDAR_EMAIL"
+        },
+        "timeMin": "={{ $json.output.date + 'T' + $json.output.startTime + ':00+05:00' }}",
+        "timeMax": "={{ $json.output.date + 'T' + $json.output.endTime + ':00+05:00' }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        1328,
+        -1088
+      ],
+      "id": "b1922426-0ca5-4d2b-9d26-5a3f4971f2a8",
+      "name": "Get availability for booking",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "unEcwPqQoBo4rucK",
+          "name": "Google OAuth2 API"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "f660b4ae-9cfb-4eac-b032-1fd0187fe8ef",
+              "leftValue": "={{ $json.available }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1584,
+        -1088
+      ],
+      "id": "edfa49c6-eef7-4801-ad0d-5f6ffde6bb3e",
+      "name": "If1"
+    },
+    {
+      "parameters": {
+        "calendar": {
+          "__rl": true,
+          "value": "YOUR_CALENDAR_EMAIL",
+          "mode": "list",
+          "cachedResultName": "YOUR_CALENDAR_EMAIL"
+        },
+        "start": "={{ $('Validate request').first().json.output.date + 'T' + $('Validate request').first().json.output.startTime + ':00+05:00' }}",
+        "end": "={{ $('Validate request').first().json.output.date + 'T' + $('Validate request').first().json.output.endTime + ':00+05:00' }}",
+        "additionalFields": {
+          "description": "={{ 'Patient: ' + $('Validate request').first().json.output.patientName + '\\nPhone: ' + $('Validate request').first().json.phoneKey + '\\nService: ' + $('Validate request').first().json.output.service + '\\nWhatsApp: ' + $('Validate request').first().json.waId }}",
+          "summary": "={{ 'Dental Appointment - ' + $('Validate request').first().json.output.patientName + ' (' + $('Validate request').first().json.output.service + ')' }}"
+        }
+      },
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        1856,
+        -1088
+      ],
+      "id": "dd8b67f9-0a63-424f-85d2-afaaa5341d28",
+      "name": "Create an event",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "unEcwPqQoBo4rucK",
+          "name": "Google OAuth2 API"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.output.intent }}",
+                    "rightValue": "book",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "63efab23-e3d2-4931-af87-fb0964d99fd9"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "book"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "164f57bf-0f40-474c-8b90-ceff5ae3acae",
+                    "leftValue": "={{ $json.output.intent }}",
+                    "rightValue": "reschedule",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "reschedule"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "cae940c1-9fc6-4651-b06c-f1f854ed4c67",
+                    "leftValue": "={{ $json.output.intent }}",
+                    "rightValue": "cancel",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "cancel"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "18a7ff05-b751-49c4-9ca7-740d21c7ee59",
+                    "leftValue": "={{ $json.output.intent }}",
+                    "rightValue": "appointment_info",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "appointment_info"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "d94305bf-f4ad-47f2-a431-d279ae0ffd9c",
+                    "leftValue": "={{ $json.output.intent }}",
+                    "rightValue": "greeting",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "greeting"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "856bc4f4-803c-4d8c-b723-18527e1a7084",
+                    "leftValue": "={{ $json.output.intent }}",
+                    "rightValue": "info",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "info"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "0e90c2d6-9ee5-48dd-8891-4f3772087777",
+                    "leftValue": "={{ $json.output.intent }}",
+                    "rightValue": "fallback",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "fallback"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        784,
+        -960
+      ],
+      "id": "815fcb20-72ec-4a75-a078-ba22704b97cc",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "calendar": {
+          "__rl": true,
+          "value": "YOUR_CALENDAR_EMAIL",
+          "mode": "list",
+          "cachedResultName": "YOUR_CALENDAR_EMAIL"
+        },
+        "limit": 20,
+        "timeMax": "={{ $now.plus({ months: 6 }) }}",
+        "options": {
+          "orderBy": "startTime",
+          "query": "={{ $json.waId }}"
+        }
+      },
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        1280,
+        -880
+      ],
+      "id": "b4cda65f-301d-4266-91f3-b986874c644c",
+      "name": "Get an Existing Appointment",
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "unEcwPqQoBo4rucK",
+          "name": "Google OAuth2 API"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "9d76e623-a38e-41c9-b99e-881a7bd600bd",
+              "leftValue": "={{ $json.proceed === true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1824,
+        -880
+      ],
+      "id": "02c347a5-035e-4c04-9e49-51c21c439c2e",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "calendar": {
+          "__rl": true,
+          "value": "YOUR_CALENDAR_EMAIL",
+          "mode": "list",
+          "cachedResultName": "YOUR_CALENDAR_EMAIL"
+        },
+        "eventId": "={{ $('Pick appointment').first().json.eventId }}",
+        "updateFields": {
+          "end": "={{ $('Validate request').first().json.output.date + 'T' + $('Validate request').first().json.output.endTime + ':00+05:00' }}",
+          "start": "={{ $('Validate request').first().json.output.date + 'T' + $('Validate request').first().json.output.startTime + ':00+05:00' }}"
+        }
+      },
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        2800,
+        -880
+      ],
+      "id": "bb09985a-7b09-4ef3-b2b6-2637732fe711",
+      "name": "Update an Existing Appointment",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "unEcwPqQoBo4rucK",
+          "name": "Google OAuth2 API"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "delete",
+        "calendar": {
+          "__rl": true,
+          "value": "YOUR_CALENDAR_EMAIL",
+          "mode": "list",
+          "cachedResultName": "YOUR_CALENDAR_EMAIL"
+        },
+        "eventId": "={{ $('Pick appointment').first().json.eventId }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        2272,
+        -688
+      ],
+      "id": "82aa65ed-b3e3-48c5-a766-aa061f78a14e",
+      "name": "Cancel an Existing Appointment",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "unEcwPqQoBo4rucK",
+          "name": "Google OAuth2 API"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "content": "## AI",
+        "height": 576,
+        "width": 800,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -480,
+        -1104
+      ],
+      "id": "71b6286a-40b5-4fef-a135-cef60153c512",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "content": "## Booking system",
+        "height": 768,
+        "width": 2724,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        352,
+        -1136
+      ],
+      "id": "788e0c54-4989-4aeb-9eaa-94a4a31e31f2",
+      "name": "Sticky Note3"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "22ee52cd-5f99-4588-8ea2-e46abb8f509d",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1056,
+        -1088
+      ],
+      "id": "60acf6a6-24dc-48ee-91c1-98bd76d93fa8",
+      "name": "Guardrail - Booking info complete"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "f62cb940-dd6f-4b64-a410-d62d9a4fca28",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1056,
+        -864
+      ],
+      "id": "c35d1596-8d4d-4773-b21d-7cbddeacbf4d",
+      "name": "Guardrail - Reschedule info complete"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "02114f38-a445-446f-b374-5991c2080d42",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1056,
+        -640
+      ],
+      "id": "2c4f1352-84bf-43e1-900c-ec8920d9940c",
+      "name": "Guardrail - Cancel info complete"
+    },
+    {
+      "parameters": {
+        "jsCode": "const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];\nconst DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];\n\n// Google Calendar can return UTC (Z) or any offset. Always show Pakistan time (UTC+5).\nconst toPktText = (s) => {\n  const m = /^(\\d{4}-\\d{2}-\\d{2})T(\\d{2}):(\\d{2})(?::\\d{2}(?:\\.\\d+)?)?(Z|[+-]\\d{2}:?\\d{2})?$/.exec(s);\n  if (!m) return s;\n  let offset = 0;\n  const tz = m[4];\n  if (tz && tz !== 'Z') {\n    const sign = tz[0] === '-' ? -1 : 1;\n    const digits = tz.slice(1).replace(':', '');\n    offset = sign * (+digits.slice(0, 2) * 60 + +digits.slice(2, 4));\n  }\n  const utcMs = Date.UTC(+m[1].slice(0, 4), +m[1].slice(5, 7) - 1, +m[1].slice(8, 10), +m[2], +m[3]) - offset * 60000;\n  const p = new Date(utcMs + 300 * 60000);\n  const h = p.getUTCHours();\n  return DAYS[p.getUTCDay()] + ', ' + p.getUTCDate() + ' ' + MONTHS[p.getUTCMonth()] + ' ' + p.getUTCFullYear() + ', '\n    + String(h % 12 || 12) + ':' + String(p.getUTCMinutes()).padStart(2, '0') + ' ' + (h < 12 ? 'AM' : 'PM');\n};\n\nconst describe = (event, lines) => {\n  const start = event.start || {};\n  const when = toPktText(String(start.dateTime || start.date || ''));\n  let service = '';\n  for (const line of lines) {\n    if (line.startsWith('Service: ')) service = line.slice(9).trim();\n  }\n  return when + (service ? ' (' + service + ')' : '');\n};\n\nconst items = $input.all();\nconst ctx = items.length ? items[0].json : {};\nconst phoneKey = String(ctx.phoneKey || '');\nconst waId = String(ctx.waId || '');\nconst intent = String(ctx.intent || '');\n\n// Only appointments booked from this same WhatsApp number are ever considered\nconst events = [];\nfor (const it of items) {\n  const e = it.json;\n  if (!e.id || e.status === 'cancelled') continue;\n  const lines = String(e.description || '').split('\\n').map((l) => l.trim());\n  if (lines.includes('WhatsApp: ' + waId)) events.push({ e, lines });\n}\n\nconst exact = events.filter((x) => x.lines.includes('Phone: ' + phoneKey));\n// Cancel is destructive, so the phone number must match exactly.\n// For other intents, if the patient typed a slightly different number, still use this WhatsApp's own appointment.\nconst matches = intent === 'cancel' ? exact : (exact.length ? exact : events);\n\nconst count = matches.length;\nlet reply = '';\nlet proceed = false;\nlet eventId = '';\n\nif (count === 0) {\n  reply = 'Is number aur aap ke WhatsApp se koi upcoming appointment nahi mili. Agar kisi aur number se book ki thi to clinic ko call karein.';\n} else if (intent === 'appointment_info') {\n  const described = matches.slice(0, 5).map((x) => describe(x.e, x.lines));\n  reply = count === 1\n    ? 'Aapki upcoming appointment: ' + described[0] + ' ✅'\n    : 'Aap ki upcoming appointments:\\n' + described.map((t) => '- ' + t).join('\\n');\n} else if (count > 1) {\n  reply = 'Aap ki ek se zyada upcoming appointments hain. Please clinic ko call karke confirm karein.';\n} else {\n  proceed = true;\n  eventId = matches[0].e.id;\n}\n\nreturn [{ json: { matchCount: count, eventId, proceed, replyMessage: reply } }];\n"
+      },
+      "id": "efc941e6-2428-4a7d-94b5-1d77e6948641",
+      "name": "Pick appointment",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1664,
+        -880
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "calendar",
+        "calendar": {
+          "__rl": true,
+          "cachedResultName": "YOUR_CALENDAR_EMAIL",
+          "mode": "list",
+          "value": "YOUR_CALENDAR_EMAIL"
+        },
+        "timeMin": "={{ $('Validate request').first().json.output.date + 'T' + $('Validate request').first().json.output.startTime + ':00+05:00' }}",
+        "timeMax": "={{ $('Validate request').first().json.output.date + 'T' + $('Validate request').first().json.output.endTime + ':00+05:00' }}",
+        "options": {}
+      },
+      "id": "2df67a6e-5c92-46fa-b2ff-320507cf9bcb",
+      "name": "Get availability for reschedule",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        2256,
+        -1088
+      ],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "unEcwPqQoBo4rucK",
+          "name": "Google OAuth2 API"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "0b1f6d1a-7c7e-4d6b-9f8e-3a5c2d4e6f10",
+              "leftValue": "={{ $json.available }}",
+              "operator": {
+                "operation": "true",
+                "singleValue": true,
+                "type": "boolean"
+              },
+              "rightValue": ""
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          }
+        },
+        "options": {}
+      },
+      "id": "e8342605-98da-4a3d-8d44-8b52a7061b47",
+      "name": "If reschedule slot available",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2496,
+        -880
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "7a1c0b2e-1111-4a00-9a01-000000000001",
+              "name": "nowDate",
+              "type": "string",
+              "value": "={{ $now.setZone('Asia/Karachi').toFormat('yyyy-MM-dd') }}"
+            },
+            {
+              "id": "7a1c0b2e-1111-4a00-9a01-000000000002",
+              "name": "nowTime",
+              "type": "string",
+              "value": "={{ $now.setZone('Asia/Karachi').toFormat('HH:mm') }}"
+            },
+            {
+              "id": "7a1c0b2e-1111-4a00-9a01-000000000003",
+              "name": "waId",
+              "type": "string",
+              "value": "={{ $('WhatsApp Trigger').first().json.messages[0].from }}"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "0f8d4ada-9a93-4988-8f41-6e19c1d89ff1",
+      "name": "Add current time",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        416,
+        -880
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];\nconst DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];\nconst SAKAMOTO = [0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4];\n\nconst HOURS_TEXT = 'Clinic Monday se Saturday, subah 10 baje se raat 8 baje tak khula hai.';\nconst GREETING_REPLY = 'Assalam o Alaikum! 👋 Main ABC Dental Clinic ka virtual assistant hoon. '\n  + 'Main appointment book, reschedule ya cancel karne mein, aur clinic ki services, prices, '\n  + 'doctors aur timings ke baare mein madad kar sakta hoon. Aap kis tarah ki madad chahte hain?';\nconst FALLBACK_REPLY = 'Sorry, mujhe samajh nahi aaya. Aap appointment book, reschedule, cancel karna chahte hain, '\n  + 'ya clinic information chahiye?';\nconst INFO_EMPTY_REPLY = 'Is baare mein mere paas abhi pakki information nahi hai. '\n  + 'Please clinic ko call karke confirm kar lein.';\nconst FIELD_TEXT = {\n  name: 'apna naam',\n  phone: 'phone number (kam az kam 10 digits)',\n  service: 'kis service ke liye aana hai (jaise Cleaning, Braces)',\n  date: 'kis date par aana chahenge',\n  time: 'kis time par aana chahenge (jaise 3 PM)',\n};\nconst KNOWN_INTENTS = ['book', 'reschedule', 'cancel', 'appointment_info', 'info', 'greeting', 'fallback'];\n\nconst isLeap = (y) => (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;\nconst isDate = (s) => {\n  if (typeof s !== 'string' || !/^\\d{4}-\\d{2}-\\d{2}$/.test(s)) return false;\n  const y = +s.slice(0, 4);\n  const m = +s.slice(5, 7);\n  const d = +s.slice(8, 10);\n  if (m < 1 || m > 12 || d < 1) return false;\n  const dim = [31, isLeap(y) ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];\n  return d <= dim[m - 1];\n};\nconst isTime = (s) => typeof s === 'string' && /^\\d{2}:\\d{2}$/.test(s) && +s.slice(0, 2) <= 23 && +s.slice(3) <= 59;\nconst weekday = (date) => {\n  // 0 = Sunday ... 6 = Saturday\n  let y = +date.slice(0, 4);\n  const m = +date.slice(5, 7);\n  const d = +date.slice(8, 10);\n  if (m < 3) y -= 1;\n  return (y + Math.floor(y / 4) - Math.floor(y / 100) + Math.floor(y / 400) + SAKAMOTO[m - 1] + d) % 7;\n};\nconst prettyTime = (t) => {\n  const h = +t.slice(0, 2);\n  return String(h % 12 || 12) + ':' + t.slice(3, 5) + ' ' + (h < 12 ? 'AM' : 'PM');\n};\nconst pad2 = (n) => String(n).padStart(2, '0');\nconst addMinutes = (t, mins) => {\n  const total = +t.slice(0, 2) * 60 + +t.slice(3, 5) + mins;\n  return pad2(Math.floor(total / 60)) + ':' + pad2(total % 60);\n};\nconst joinParts = (parts) => (parts.length === 1 ? parts[0] : parts.slice(0, -1).join(', ') + ' aur ' + parts[parts.length - 1]);\nconst askMissing = (missing) => {\n  let text = 'Ji zaroor. Please bata dein: ' + joinParts(missing.map((k) => FIELD_TEXT[k])) + '.';\n  if (missing.includes('time')) text += ' ' + HOURS_TEXT;\n  return text;\n};\n\nconst results = [];\nfor (const item of $input.all()) {\n  const data = { ...item.json };\n  const o = { ...(data.output || {}) };\n  let intent = String(o.intent || '');\n  const name = String(o.patientName || '').trim();\n  const service = String(o.service || '').trim();\n  const digits = String(o.phone || '').replace(/\\D/g, '');\n  const phoneKey = digits.length >= 10 ? digits.slice(-10) : '';\n  const date = String(o.date || '').trim();\n  const start = String(o.startTime || '').trim();\n  const agentMessage = String(o.message || '').trim();\n\n  // Unknown or empty intent must never end without a reply\n  if (!KNOWN_INTENTS.includes(intent)) {\n    intent = 'fallback';\n    o.intent = 'fallback';\n  }\n\n  const needsSlot = ['book', 'reschedule'].includes(intent);\n  const needsService = intent === 'book';\n  const isAction = ['book', 'reschedule', 'cancel', 'appointment_info'].includes(intent);\n\n  // Every appointment is exactly 1 hour, so endTime is always computed here\n  let end = '';\n  if (isTime(start)) end = addMinutes(start, 60);\n  if (needsSlot) {\n    o.startTime = start;\n    o.endTime = end;\n    o.date = date;\n  }\n\n  let valid = true;\n  let reply = '';\n\n  if (isAction) {\n    const missing = [];\n    if (!name) missing.push('name');\n    if (!phoneKey) missing.push('phone');\n    if (needsService && !service) missing.push('service');\n    if (needsSlot) {\n      if (!isDate(date)) missing.push('date');\n      if (!isTime(start)) missing.push('time');\n    }\n\n    if (missing.length) {\n      valid = false;\n      reply = askMissing(missing);\n    } else if (needsSlot) {\n      const nowDate = String(data.nowDate || '');\n      const nowTime = String(data.nowTime || '');\n      const inPast = date < nowDate || (date === nowDate && start <= nowTime);\n      const isSunday = weekday(date) === 0;\n      const inHours = start >= '10:00' && end <= '20:00';\n      if (inPast) {\n        valid = false;\n        reply = 'Ye date/time guzar chuka hai. Koi aur date aur time bata dein.';\n      } else if (isSunday) {\n        valid = false;\n        reply = 'Sunday ko clinic band hota hai. ' + HOURS_TEXT + ' Koi aur din bata dein.';\n      } else if (!inHours) {\n        valid = false;\n        reply = HOURS_TEXT + ' Koi aur time bata dein.';\n      }\n    }\n  } else if (intent === 'greeting') {\n    reply = GREETING_REPLY;\n  } else if (intent === 'info') {\n    if (!agentMessage) reply = INFO_EMPTY_REPLY;\n  } else if (intent === 'fallback') {\n    if (!agentMessage) reply = FALLBACK_REPLY;\n  }\n\n  data.output = o;\n  data.phoneKey = phoneKey;\n  data.valid = valid;\n  data.replyMessage = reply;\n  if (isDate(date) && isTime(start)) {\n    data.displayDate = DAYS[weekday(date)] + ', ' + parseInt(date.slice(8, 10), 10) + ' ' + MONTHS[+date.slice(5, 7) - 1] + ' ' + date.slice(0, 4);\n    data.displayTime = prettyTime(start);\n  }\n  results.push({ json: data });\n}\n\nreturn results;\n"
+      },
+      "id": "99af4713-af55-4e6e-8562-12e7c3682fd4",
+      "name": "Validate request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        608,
+        -880
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "7a1c0b2e-2222-4a00-9a01-000000000001",
+              "name": "phoneKey",
+              "type": "string",
+              "value": "={{ $('Validate request').first().json.phoneKey }}"
+            },
+            {
+              "id": "7a1c0b2e-2222-4a00-9a01-000000000002",
+              "name": "waId",
+              "type": "string",
+              "value": "={{ $('Validate request').first().json.waId }}"
+            },
+            {
+              "id": "7a1c0b2e-2222-4a00-9a01-000000000003",
+              "name": "intent",
+              "type": "string",
+              "value": "={{ $('Validate request').first().json.output.intent }}"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "5a71bfe1-d084-4652-9b98-fc56b43d0710",
+      "name": "Attach appointment context",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1488,
+        -880
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "7a1c0b2e-3333-4a00-9a01-000000000001",
+              "leftValue": "={{ $('Validate request').first().json.output.intent === 'cancel' }}",
+              "operator": {
+                "operation": "true",
+                "singleValue": true,
+                "type": "boolean"
+              },
+              "rightValue": ""
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          }
+        },
+        "options": {}
+      },
+      "id": "f3cd8126-5170-4e54-b68b-d24fdaaceaeb",
+      "name": "Is cancel request",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2016,
+        -880
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "b1f0c9a2-0001-4a00-9a01-00000000a001",
+              "leftValue": "={{ !!$json.messages?.[0]?.text?.body }}",
+              "operator": {
+                "operation": "true",
+                "singleValue": true,
+                "type": "boolean"
+              },
+              "rightValue": ""
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          }
+        },
+        "options": {}
+      },
+      "id": "f864e2dc-4fa3-4d8d-82a6-c4b71f3a47c8",
+      "name": "Only user messages",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -384,
+        -1056
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Sticky patient details: the LLM (small model) sometimes blanks name/phone/service/date\n// that the patient already gave. Refill them from per-WhatsApp-number saved state.\nconst FIELDS_BY_INTENT = {\n  book: ['patientName', 'phone', 'service', 'date'],\n  reschedule: ['patientName', 'phone', 'date'],\n  cancel: ['patientName', 'phone'],\n  appointment_info: ['patientName', 'phone'],\n};\nconst ALL_FIELDS = ['patientName', 'phone', 'service', 'date'];\nconst TTL_MS = 30 * 60 * 1000; // forget an unfinished request after 30 min of silence\n\nconst store = $getWorkflowStaticData('global');\nstore.sessions = store.sessions || {};\nconst now = Date.now();\nfor (const k of Object.keys(store.sessions)) {\n  if (now - (store.sessions[k].at || 0) > TTL_MS) delete store.sessions[k];\n}\n\nconst waId = String($('WhatsApp Trigger').first().json.messages[0].from);\nconst prev = store.sessions[waId] || {};\nconst cur = { ...prev };\nconst results = [];\n\nfor (const item of $input.all()) {\n  const o = { ...(item.json.output || {}) };\n  const intent = String(o.intent || '');\n  const refill = FIELDS_BY_INTENT[intent];\n\n  if (intent === 'greeting') {\n    delete store.sessions[waId];\n  } else if (refill) {\n    let filled = false;\n    for (const f of refill) {\n      if (!String(o[f] ?? '').trim() && prev[f]) {\n        o[f] = prev[f];\n        filled = true;\n      }\n    }\n    // Newest non-empty value always wins (handles corrected phone numbers etc.)\n    for (const f of ALL_FIELDS) {\n      const v = String(o[f] ?? '').trim();\n      if (v) cur[f] = v;\n    }\n    if (filled) o.message = ''; // the agent's 'please give me X' text is stale now\n    cur.at = now;\n    store.sessions[waId] = cur;\n  }\n\n  results.push({ json: { ...item.json, output: o } });\n}\n\nreturn results;\n"
+      },
+      "id": "a1b92350-91e0-40b7-a4bc-27fa80dd83a6",
+      "name": "Merge saved details",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        144,
+        -1056
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// A booking / reschedule / cancel just succeeded: forget service, date and time\n// so the next request starts clean. Name and phone are kept for convenience.\nconst store = $getWorkflowStaticData('global');\nconst waId = String($('WhatsApp Trigger').first().json.messages[0].from);\nconst s = store.sessions && store.sessions[waId];\nif (s) {\n  delete s.service;\n  delete s.date;\n  delete s.startTime;\n  store.sessions[waId] = s;\n}\nreturn $input.all();\n"
+      },
+      "id": "2cd35d14-e1af-4a93-aa29-75ac5dbe317c",
+      "name": "Clear booking state",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2944,
+        -1088
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Default Data Loader": {
+      "ai_document": [
+        [
+          {
+            "node": "Simple Vector Store",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "On form submission": {
+      "main": [
+        [
+          {
+            "node": "Simple Vector Store",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings Google Gemini": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Simple Vector Store",
+            "type": "ai_embedding",
+            "index": 0
+          },
+          {
+            "node": "Simple Vector Store1",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Vector Store1": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get availability for booking": {
+      "main": [
+        [
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If1": {
+      "main": [
+        [
+          {
+            "node": "Create an event",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Guardrail - Booking info complete",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Guardrail - Reschedule info complete",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Guardrail - Cancel info complete",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Guardrail - Cancel info complete",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Is cancel request",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cancel an Existing Appointment": {
+      "main": [
+        [
+          {
+            "node": "Clear booking state",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update an Existing Appointment": {
+      "main": [
+        [
+          {
+            "node": "Clear booking state",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create an event": {
+      "main": [
+        [
+          {
+            "node": "Clear booking state",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guardrail - Booking info complete": {
+      "main": [
+        [
+          {
+            "node": "Get availability for booking",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guardrail - Reschedule info complete": {
+      "main": [
+        [
+          {
+            "node": "Get an Existing Appointment",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guardrail - Cancel info complete": {
+      "main": [
+        [
+          {
+            "node": "Get an Existing Appointment",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pick appointment": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get availability for reschedule": {
+      "main": [
+        [
+          {
+            "node": "If reschedule slot available",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If reschedule slot available": {
+      "main": [
+        [
+          {
+            "node": "Update an Existing Appointment",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add current time": {
+      "main": [
+        [
+          {
+            "node": "Validate request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate request": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get an Existing Appointment": {
+      "main": [
+        [
+          {
+            "node": "Attach appointment context",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Attach appointment context": {
+      "main": [
+        [
+          {
+            "node": "Pick appointment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is cancel request": {
+      "main": [
+        [
+          {
+            "node": "Cancel an Existing Appointment",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get availability for reschedule",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WhatsApp Trigger": {
+      "main": [
+        [
+          {
+            "node": "Only user messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Only user messages": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Merge saved details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge saved details": {
+      "main": [
+        [
+          {
+            "node": "Add current time",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clear booking state": {
+      "main": [
+        [
+          {
+            "node": "Send message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true
+  },
+  "versionId": "a39392b4-d94c-4a19-804e-938fe741f29b",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "aiBuilderAssisted": true,
+    "builderVariant": "mcp",
+    "instanceId": "4f635d214e2ebd4649d29c9375649ab15273c5c47bbd24ba1c5ab61fd57cebd7"
+  },
+  "nodeGroups": [],
+  "id": "coY1bJ8UNVnQrCZ3",
+  "tags": [
+    {
+      "updatedAt": "2026-09-30T00:06:35.823Z",
+      "createdAt": "2026-09-30T00:06:35.823Z",
+      "id": "5hrdhe6eiV81f27i",
+      "name": "My Dent Ai"
+    }
+  ]
+}
